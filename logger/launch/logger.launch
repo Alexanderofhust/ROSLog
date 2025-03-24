@@ -1,5 +1,5 @@
 <launch>
-    <node pkg="my_logger_cpp" type="logger_node" name="logger_node" output="screen">
-        <rosparam command="load" file="$(find my_logger_cpp)/config/params.yaml"/>
+    <node pkg="logger" type="logger_node" name="logger_node" output="screen">
+        <rosparam command="load" file="$(find logger)/config/params.yaml"/>
     </node>
 </launch>

@@ -1,5 +1,5 @@
 #include "logger_node.h"
-#include <ros/ros.h>
+//#include <ros/ros.h>
 
 // 构造函数
 LoggerNode::LoggerNode() {
@@ -9,6 +9,7 @@ LoggerNode::LoggerNode() {
     // 从参数服务器加载配置
     nh.getParam("topics", topics_);
     nh.param<std::string>("log_comment", log_comment_, "Log: ");
+    nh.param<std::string>("log_path", log_path_, "/home/hustlyrm/roslog/mylogs/");  // 加载日志路径
 
     // 初始化订阅器
     for (const auto& topic : topics_) {
@@ -19,6 +20,24 @@ LoggerNode::LoggerNode() {
 
     // 创建定时器（1秒周期）
     timer_ = nh.createTimer(ros::Duration(1.0), &LoggerNode::timerCallback, this);
+
+    std::string log_filename = getCurrentTimeString() + ".log";
+    std::string log_path = log_path_  + log_filename;
+
+    log_file_.open(log_path, std::ios::app);
+    ROS_INFO("Log path: %s", log_path.c_str());
+    if (!log_file_.is_open()) {
+        ROS_ERROR("Failed to open log file!");
+    }
+}
+
+LoggerNode::~LoggerNode(){
+    
+    // 关闭日志文件
+    if (log_file_.is_open()) {
+        log_file_.close();
+    }
+    
 }
 
 // 回调函数，处理订阅的消息
@@ -35,6 +54,10 @@ void LoggerNode::timerCallback(const ros::TimerEvent& event) {
     std::string log_str = log_comment_;
     for (const auto& topic : topics_) {
         log_str += topic + ": " + topic_data_[topic] + " ";
+    }
+    // 输出日志到文件
+    if (log_file_.is_open()) {
+        log_file_ << log_str << std::endl;
     }
 
     // 输出日志
