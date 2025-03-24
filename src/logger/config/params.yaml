@@ -1,0 +1,3 @@
+logger_node:
+  topics: ["/temperature", "/pressure"]  # 订阅的话题列表
+  log_comment: "Sensor Data: "           # 日志前缀
