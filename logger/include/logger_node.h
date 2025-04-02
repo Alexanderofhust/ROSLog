@@ -9,6 +9,9 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <unistd.h>
+#include <vector>
+#include <ctime>
 
 class LoggerNode {
 public:
@@ -22,6 +25,10 @@ private:
 
     // 定时器回调函数，记录日志
     void timerCallback(const ros::TimerEvent& event);
+
+    // 系统状态记录
+    double getCpuUsage();
+    void getMemoryUsage(unsigned long& total, unsigned long& free, unsigned long& available);
 
     // 成员变量
     std::vector<std::string> topics_;  // 订阅的话题列表

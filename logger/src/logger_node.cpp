@@ -49,19 +49,111 @@ void LoggerNode::callback(const std_msgs::String::ConstPtr& msg, const std::stri
 void LoggerNode::timerCallback(const ros::TimerEvent& event) {
     // 动态获取最新评论（允许实时调整）
     ros::param::get("~log_comment", log_comment_);
+    
+    // 获取系统资源使用情况
+    double cpuUsage = getCpuUsage();
+    unsigned long totalMem = 0, freeMem = 0, availableMem = 0;
+    getMemoryUsage(totalMem, freeMem, availableMem);
+    
+    // 计算内存使用百分比
+    double memUsagePercent = (totalMem - availableMem) * 100.0 / totalMem;
+    double totalMemMB = totalMem / 1024.0;
+    double usedMemMB = (totalMem - availableMem) / 1024.0;
 
-    // 拼接所有话题数据
-    std::string log_str = log_comment_;
+    // 拼接所有话题数据和系统资源信息
+    std::stringstream log_ss;
+    log_ss << log_comment_;
+    
+    // 添加系统资源信息
+    log_ss << " [CPU: " << std::fixed << std::setprecision(1) << cpuUsage << "%"
+           << " | Mem: " << std::fixed << std::setprecision(1) << memUsagePercent << "%"
+           << " (" << std::fixed << std::setprecision(1) << usedMemMB << "MB/" 
+           << std::fixed << std::setprecision(1) << totalMemMB << "MB)]";
+    
+    // 添加各话题数据
     for (const auto& topic : topics_) {
-        log_str += topic + ": " + topic_data_[topic] + " ";
+        log_ss << " " << topic << ": " << topic_data_[topic];
     }
+
+    std::string log_str = log_ss.str();
+
     // 输出日志到文件
     if (log_file_.is_open()) {
         log_file_ << log_str << std::endl;
     }
 
-    // 输出日志
+    // 输出到ROS日志系统
     ROS_INFO("%s", log_str.c_str());
+}
+
+void LoggerNode::recordSystemStatus()
+{
+
+}
+
+// 获取系统时间戳，当前不需要
+// std::string getCurrentTimestamp() {
+//     auto now = std::chrono::system_clock::now();
+//     auto in_time_t = std::chrono::system_clock::to_time_t(now);
+//     std::stringstream ss;
+//     ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %X");
+//     return ss.str();
+// }
+
+// 获取CPU使用率
+double LoggerNode::getCpuUsage() {
+    static unsigned long long lastTotalUser = 0, lastTotalUserLow = 0, lastTotalSys = 0, lastTotalIdle = 0;
+    
+    std::ifstream procStat("/proc/stat");
+    std::string line;
+    std::getline(procStat, line);
+    std::istringstream iss(line);
+    
+    std::string cpu;
+    unsigned long long user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice;
+    iss >> cpu >> user >> nice >> system >> idle >> iowait >> irq >> softirq >> steal >> guest >> guest_nice;
+    
+    unsigned long long totalIdle = idle + iowait;
+    unsigned long long totalNonIdle = user + nice + system + irq + softirq + steal;
+    unsigned long long total = totalIdle + totalNonIdle;
+    
+    static double prevCpuUsage = 0.0;
+    
+    if (lastTotalUser != 0) {
+        unsigned long long totald = total - (lastTotalUser + lastTotalSys + lastTotalIdle);
+        unsigned long long idled = totalIdle - lastTotalIdle;
+        double cpuUsage = (totald - idled) * 100.0 / totald;
+        prevCpuUsage = cpuUsage;
+    }
+    
+    lastTotalUser = user;
+    lastTotalSys = system;
+    lastTotalIdle = totalIdle;
+    
+    return prevCpuUsage;
+}
+
+// 获取内存使用情况
+void LoggerNode::getMemoryUsage(unsigned long& total, unsigned long& free, unsigned long& available) {
+    std::ifstream memInfo("/proc/meminfo");
+    std::string line;
+    
+    while (std::getline(memInfo, line)) {
+        std::istringstream iss(line);
+        std::string key;
+        unsigned long value;
+        std::string unit;
+        
+        iss >> key >> value >> unit;
+        
+        if (key == "MemTotal:") {
+            total = value;
+        } else if (key == "MemFree:") {
+            free = value;
+        } else if (key == "MemAvailable:") {
+            available = value;
+        }
+    }
 }
 
 // 主函数
